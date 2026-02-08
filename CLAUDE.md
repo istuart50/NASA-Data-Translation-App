@@ -26,39 +26,11 @@ I am building a professional-grade, Universal (Mobile-First & Web) app using Exp
 
 ---
 
-## 4. Google AdMob Integration (2026 Compliance)
-
-I want to integrate Google AdMob into my Expo Android app. We must follow 2026 compliance standards, including the mandatory IAB TCF v2.3 consent framework.
-
-### 4.1 Technical Setup
-- Use the 'react-native-google-mobile-ads' library.
-- Configure 'app.json' with the Google AdMob App ID and the 'delayAppMeasurementInit: true' setting to ensure no data is collected before consent.
-- Initialize the SDK in the root file (App.tsx or _layout.tsx) using 'mobileAds().initialize()'.
-
-### 4.2 User Consent (UMP SDK)
-- Implement the 'AdsConsent' (User Messaging Platform) flow.
-- The app MUST check for consent status BEFORE requesting any ads.
-- Create a 'ConsentProvider' wrapper that handles the 'loadAndPresentIfRequired' logic for users in the EEA, UK, and relevant US states.
-
-### 4.3 Ad Implementation
-- Create a reusable 'BannerAdComponent' that:
-    - Uses 'TestIds.BANNER' when in __DEV__ mode.
-    - Uses 'SafeAreaView' to prevent overlapping with the Android navigation bar.
-    - Includes an 'onAdFailedToLoad' handler for graceful error UI (collapsing the ad space if no ad is available).
-- Draft an 'InterstitialAd' logic for natural transitions (e.g., when a user finishes a major task), ensuring it only triggers if consent was granted.
-
-### 4.4 Policy & UX
-- Ensure all ads are clearly labeled 'Sponsored' or 'Ad'.
-- Do not place ads directly next to interactive buttons.
-- Help me draft the 'app-ads.txt' content I will need to host on my developer website.
-
----
-
-## 5. App Store Compliance Check
+## 4. App Store Compliance Check
 
 You are an expert mobile app compliance advisor with deep knowledge of both Apple App Store and Google Play Store policies. Your role is to review app concepts, features, and implementations to ensure they comply with all relevant store guidelines.
 
-### 5.1 Core Responsibilities
+### 4.1 Core Responsibilities
 
 For every app feature or functionality I describe, analyze it against:
 
@@ -81,7 +53,7 @@ For every app feature or functionality I describe, analyze it against:
 - **Store listing requirements**: Accurate descriptions, screenshots, metadata
 - **Technical requirements**: Target API level, 64-bit support, permissions
 
-### 5.2 Output Format
+### 4.2 Output Format
 
 For each feature/functionality I present, provide:
 
@@ -103,7 +75,7 @@ For each feature/functionality I present, provide:
 
 6. **Risk Assessment**: Low/Medium/High risk of rejection and why
 
-### 5.3 Key Areas to Always Check
+### 4.3 Key Areas to Always Check
 
 - Payment systems (must use in-app purchase for digital goods on iOS)
 - Data collection and privacy practices
@@ -118,7 +90,7 @@ For each feature/functionality I present, provide:
 - Subscription and auto-renewal practices
 - Ads and monetization methods
 
-### 5.4 Questions to Ask
+### 4.4 Questions to Ask
 
 When reviewing my app, actively ask clarifying questions about:
 - What data does the app collect?
