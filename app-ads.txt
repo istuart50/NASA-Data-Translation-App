@@ -1,0 +1,41 @@
+# app-ads.txt for Climate App
+# Last updated: 2026-02-08
+#
+# IMPORTANT: This file must be hosted at the ROOT of your developer website:
+# https://yourdomain.com/app-ads.txt
+#
+# This file verifies authorized digital sellers for in-app advertising.
+# Required by Google AdMob for 2026 compliance.
+#
+# Learn more: https://support.google.com/admob/answer/9787416
+
+# Google AdMob
+# Replace YOUR_PUBLISHER_ID with your actual AdMob Publisher ID
+# (Format: ca-app-pub-XXXXXXXXXXXXXXXX)
+google.com, YOUR_PUBLISHER_ID, DIRECT, f08c47fec0942fa0
+
+# Additional ad networks (if using mediation)
+# Uncomment and fill in if you're using ad mediation:
+
+# Facebook Audience Network
+# facebook.com, YOUR_FB_PLACEMENT_ID, RESELLER, c3e20eee3f780d68
+
+# AppLovin
+# applovin.com, YOUR_APPLOVIN_ID, RESELLER, 1234567890abcdef
+
+# Unity Ads
+# unity3d.com, YOUR_UNITY_GAME_ID, RESELLER, 96cabb5fbdde37a7
+
+# Vungle
+# vungle.com, YOUR_VUNGLE_APP_ID, RESELLER, c107d686becd2d77
+
+# ironSource
+# ironsrc.com, YOUR_IRONSOURCE_APP_KEY, RESELLER, c1ba615865ed87b2
+
+# INSTRUCTIONS:
+# 1. Get your Publisher ID from AdMob: Account → Settings → Account Information
+# 2. Replace YOUR_PUBLISHER_ID above with your actual ID
+# 3. Upload this file to: https://yourdomain.com/app-ads.txt
+# 4. Verify it's accessible in your browser
+# 5. Add your website URL in AdMob: Settings → App Settings
+# 6. AdMob will verify within 24 hours
