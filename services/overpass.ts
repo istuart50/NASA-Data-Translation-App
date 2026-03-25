@@ -54,9 +54,12 @@ export async function searchSchoolsByZipcode(zipcode: string): Promise<School[]>
 
   const query = `[out:json][timeout:25];
 (
-  node["amenity"="school"](around:4000,${lat},${lon});
-  way["amenity"="school"](around:4000,${lat},${lon});
-  relation["amenity"="school"](around:4000,${lat},${lon});
+  node["amenity"="school"](around:5000,${lat},${lon});
+  way["amenity"="school"](around:5000,${lat},${lon});
+  relation["amenity"="school"](around:5000,${lat},${lon});
+  node["amenity"="kindergarten"](around:5000,${lat},${lon});
+  way["amenity"="kindergarten"](around:5000,${lat},${lon});
+  relation["amenity"="kindergarten"](around:5000,${lat},${lon});
 );
 out center;`;
 
