@@ -49,6 +49,18 @@ async function fetchBaseTempF(lat: number, lon: number): Promise<number> {
   }
 }
 
+function isElementaryOrMiddle(name: string): boolean {
+  const n = name.toLowerCase();
+  if (/\bhigh school\b/.test(n)) return false;
+  if (/\bsenior high\b/.test(n)) return false;
+  if (/\b(9th|10th|11th|12th) grade\b/.test(n)) return false;
+  if (/\bcollege\b/.test(n)) return false;
+  if (/\buniversity\b/.test(n)) return false;
+  if (/\badult\b/.test(n)) return false;
+  if (/\bvocational\b/.test(n)) return false;
+  return true;
+}
+
 async function fetchOSMSchools(
   bbox: [string, string, string, string],
   zipcode: string,
@@ -76,7 +88,7 @@ out center;`;
     const data = await response.json();
 
     return (data.elements ?? [])
-      .filter((el: any) => el.tags?.name)
+      .filter((el: any) => el.tags?.name && isElementaryOrMiddle(el.tags.name))
       .map((el: any) => ({
         name: el.tags.name as string,
         zipcode,
