@@ -5,9 +5,12 @@ export interface School {
   baseTemp: number;
 }
 
+type SchoolEntry = Omit<School, 'baseTemp'>;
+
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+const EDUCATION_DATA_URL = 'https://educationdata.urban.org/api/v1/schools';
 
 async function geocodeZipcode(
   zipcode: string,
@@ -21,7 +24,6 @@ async function geocodeZipcode(
   if (!data.length) return null;
 
   const result = data[0];
-  // display_name format: "ZipCode, City, County, State, Country"
   const parts = (result.display_name as string).split(', ');
   const city = parts[1] ?? parts[0];
 
@@ -46,12 +48,12 @@ async function fetchBaseTempF(lat: number, lon: number): Promise<number> {
   }
 }
 
-export async function searchSchoolsByZipcode(zipcode: string): Promise<School[]> {
-  const location = await geocodeZipcode(zipcode);
-  if (!location) return [];
-
-  const { lat, lon, city } = location;
-
+async function fetchOSMSchools(
+  lat: number,
+  lon: number,
+  zipcode: string,
+  city: string,
+): Promise<SchoolEntry[]> {
   const query = `[out:json][timeout:25];
 (
   node["amenity"="school"](around:5000,${lat},${lon});
@@ -63,21 +65,90 @@ export async function searchSchoolsByZipcode(zipcode: string): Promise<School[]>
 );
 out center;`;
 
-  const [overpassResponse, baseTemp] = await Promise.all([
-    fetch(OVERPASS_URL, { method: 'POST', body: query }),
+  try {
+    const response = await fetch(OVERPASS_URL, { method: 'POST', body: query });
+    if (!response.ok) return [];
+    const data = await response.json();
+
+    return (data.elements ?? [])
+      .filter((el: any) => el.tags?.name)
+      .map((el: any) => ({
+        name: el.tags.name as string,
+        zipcode,
+        city: (el.tags['addr:city'] as string | undefined) ?? city,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchNCESSchools(zipcode: string, city: string): Promise<SchoolEntry[]> {
+  const [ccdResult, pssResult] = await Promise.allSettled([
+    fetch(`${EDUCATION_DATA_URL}/ccd/directory/?zip_location=${zipcode}&per_page=200`),
+    fetch(`${EDUCATION_DATA_URL}/pss/directory/?zip=${zipcode}&per_page=200`),
+  ]);
+
+  const schools: SchoolEntry[] = [];
+
+  if (ccdResult.status === 'fulfilled' && ccdResult.value.ok) {
+    const data = await ccdResult.value.json();
+    for (const s of data.results ?? []) {
+      if (s.school_name) {
+        schools.push({
+          name: s.school_name as string,
+          zipcode,
+          city: (s.city_location as string | undefined) ?? city,
+        });
+      }
+    }
+  }
+
+  if (pssResult.status === 'fulfilled' && pssResult.value.ok) {
+    const data = await pssResult.value.json();
+    for (const s of data.results ?? []) {
+      if (s.school_name) {
+        schools.push({
+          name: s.school_name as string,
+          zipcode,
+          city: (s.city as string | undefined) ?? city,
+        });
+      }
+    }
+  }
+
+  return schools;
+}
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function mergeSchools(osm: SchoolEntry[], nces: SchoolEntry[]): SchoolEntry[] {
+  const seen = new Set(osm.map((s) => normalizeName(s.name)));
+  const merged = [...osm];
+
+  for (const school of nces) {
+    const key = normalizeName(school.name);
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(school);
+    }
+  }
+
+  return merged.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function searchSchoolsByZipcode(zipcode: string): Promise<School[]> {
+  const location = await geocodeZipcode(zipcode);
+  if (!location) return [];
+
+  const { lat, lon, city } = location;
+
+  const [osmSchools, ncesSchools, baseTemp] = await Promise.all([
+    fetchOSMSchools(lat, lon, zipcode, city),
+    fetchNCESSchools(zipcode, city),
     fetchBaseTempF(lat, lon),
   ]);
 
-  if (!overpassResponse.ok) return [];
-  const data = await overpassResponse.json();
-
-  return (data.elements ?? [])
-    .filter((el: any) => el.tags?.name)
-    .map((el: any) => ({
-      name: el.tags.name as string,
-      zipcode,
-      city: (el.tags['addr:city'] as string | undefined) ?? city,
-      baseTemp,
-    }))
-    .slice(0, 25);
+  return mergeSchools(osmSchools, ncesSchools).map((s) => ({ ...s, baseTemp }));
 }
