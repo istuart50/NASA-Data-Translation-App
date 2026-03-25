@@ -6,9 +6,10 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { School, getZipcodes, getSchoolsByZipcode } from '@/data/bay-area-schools';
+import { School, searchSchoolsByZipcode } from '@/services/overpass';
 
 const ROOF_COLORS = [
   { label: 'White', color: '#f0f0f0', cooling: 8 },
@@ -32,11 +33,8 @@ export default function LearningGamesScreen() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [roofColorIndex, setRoofColorIndex] = useState(4); // default: dark gray
   const [treeCount, setTreeCount] = useState(0);
-
-  const allZipcodes = useMemo(() => getZipcodes(), []);
-  const matchingZipcodes = zipcodeQuery.length > 0
-    ? allZipcodes.filter((z) => z.startsWith(zipcodeQuery))
-    : [];
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const roofColor = ROOF_COLORS[roofColorIndex];
 
@@ -57,10 +55,22 @@ export default function LearningGamesScreen() {
     return '#22c55e';
   }, [currentTemp]);
 
-  function selectZipcode(zip: string) {
-    setSelectedZipcode(zip);
-    setMatchingSchools(getSchoolsByZipcode(zip));
-    setPhase('school');
+  async function handleZipcodeChange(text: string) {
+    setZipcodeQuery(text);
+    setSearchError(null);
+    if (text.length === 5) {
+      setIsLoading(true);
+      try {
+        const schools = await searchSchoolsByZipcode(text);
+        setSelectedZipcode(text);
+        setMatchingSchools(schools);
+        setPhase('school');
+      } catch {
+        setSearchError('Could not fetch schools. Check your connection and try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
   }
 
   function selectSchool(school: School) {
@@ -88,39 +98,33 @@ export default function LearningGamesScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
           <Text style={styles.heading}>Find Your School</Text>
           <Text style={styles.description}>
-            Enter a Bay Area zipcode to find schools in that area.
+            Enter any US zipcode to find nearby schools.
           </Text>
 
           <TextInput
             style={styles.zipcodeInput}
-            placeholder="Enter zipcode (e.g. 94112)"
+            placeholder="Enter any US zipcode"
             placeholderTextColor="#999"
             keyboardType="number-pad"
             maxLength={5}
             value={zipcodeQuery}
-            onChangeText={setZipcodeQuery}
+            onChangeText={handleZipcodeChange}
           />
 
-          {zipcodeQuery.length >= 1 && (
-            <View style={styles.resultsList}>
-              {matchingZipcodes.length > 0 ? (
-                matchingZipcodes.map((zip) => (
-                  <TouchableOpacity
-                    key={zip}
-                    style={styles.zipItem}
-                    onPress={() => selectZipcode(zip)}
-                  >
-                    <Text style={styles.zipItemText}>{zip}</Text>
-                    <Text style={styles.zipItemArrow}>→</Text>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.noResults}>
-                  No schools found for this zipcode. Try another Bay Area zipcode.
-                </Text>
-              )}
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2b6cb0" />
+              <Text style={styles.loadingText}>Searching for schools...</Text>
             </View>
           )}
+
+          {searchError && (
+            <Text style={styles.noResults}>{searchError}</Text>
+          )}
+
+          <Text style={styles.attribution}>
+            School data © OpenStreetMap contributors (ODbL)
+          </Text>
         </ScrollView>
       </SafeAreaView>
     );
@@ -141,20 +145,29 @@ export default function LearningGamesScreen() {
           </Text>
 
           <View style={styles.resultsList}>
-            {matchingSchools.map((school, i) => (
-              <TouchableOpacity
-                key={`${school.name}-${i}`}
-                style={styles.schoolItem}
-                onPress={() => selectSchool(school)}
-              >
-                <View>
-                  <Text style={styles.schoolName}>{school.name}</Text>
-                  <Text style={styles.schoolCity}>{school.city}</Text>
-                </View>
-                <Text style={styles.schoolTemp}>{school.baseTemp}°F</Text>
-              </TouchableOpacity>
-            ))}
+            {matchingSchools.length === 0 ? (
+              <Text style={styles.noResults}>
+                No schools found for this zipcode. Try a nearby zipcode.
+              </Text>
+            ) : (
+              matchingSchools.map((school, i) => (
+                <TouchableOpacity
+                  key={`${school.name}-${i}`}
+                  style={styles.schoolItem}
+                  onPress={() => selectSchool(school)}
+                >
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.schoolName}>{school.name}</Text>
+                    <Text style={styles.schoolCity}>{school.city}</Text>
+                  </View>
+                  <Text style={styles.schoolTemp}>{school.baseTemp}°F</Text>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
+          <Text style={styles.attribution}>
+            School data © OpenStreetMap contributors (ODbL)
+          </Text>
         </ScrollView>
       </SafeAreaView>
     );
@@ -400,6 +413,21 @@ const styles = StyleSheet.create({
     color: '#a0aec0',
     textAlign: 'center',
     padding: 20,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 15,
+    color: '#718096',
+  },
+  attribution: {
+    fontSize: 11,
+    color: '#b0bac5',
+    textAlign: 'center',
+    marginTop: 16,
   },
   schoolItem: {
     backgroundColor: '#fff',
