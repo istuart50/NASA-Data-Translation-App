@@ -1,5 +1,4 @@
-// Replace with your Google Gemini API key
-const GEMINI_API_KEY = 'AIzaSyAJqv9Fh-DSp7uWgA9oqao_erjU3JAVGk4';
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
