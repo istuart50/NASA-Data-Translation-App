@@ -5,16 +5,16 @@ export interface School {
   baseTemp: number;
 }
 
-type SchoolEntry = Omit<School, 'baseTemp'>;
-
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org';
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast';
-const EDUCATION_DATA_URL = 'https://educationdata.urban.org/api/v1/schools';
 
-async function geocodeZipcode(
-  zipcode: string,
-): Promise<{ lat: number; lon: number; city: string } | null> {
+async function geocodeZipcode(zipcode: string): Promise<{
+  lat: number;
+  lon: number;
+  city: string;
+  bbox: [string, string, string, string]; // [south, north, west, east]
+} | null> {
   const response = await fetch(
     `${NOMINATIM_URL}/search?postalcode=${zipcode}&countrycodes=us&format=json&limit=1`,
     { headers: { 'User-Agent': 'ClimateEducationApp/1.0' } },
@@ -31,6 +31,7 @@ async function geocodeZipcode(
     lat: parseFloat(result.lat),
     lon: parseFloat(result.lon),
     city,
+    bbox: result.boundingbox, // [south, north, west, east]
   };
 }
 
@@ -49,24 +50,28 @@ async function fetchBaseTempF(lat: number, lon: number): Promise<number> {
 }
 
 async function fetchOSMSchools(
-  lat: number,
-  lon: number,
+  bbox: [string, string, string, string],
   zipcode: string,
   city: string,
-): Promise<SchoolEntry[]> {
+): Promise<Omit<School, 'baseTemp'>[]> {
+  const [south, north, west, east] = bbox;
   const query = `[out:json][timeout:25];
 (
-  node["amenity"="school"](around:5000,${lat},${lon});
-  way["amenity"="school"](around:5000,${lat},${lon});
-  relation["amenity"="school"](around:5000,${lat},${lon});
-  node["amenity"="kindergarten"](around:5000,${lat},${lon});
-  way["amenity"="kindergarten"](around:5000,${lat},${lon});
-  relation["amenity"="kindergarten"](around:5000,${lat},${lon});
+  node["amenity"="school"](${south},${west},${north},${east});
+  way["amenity"="school"](${south},${west},${north},${east});
+  relation["amenity"="school"](${south},${west},${north},${east});
+  node["amenity"="kindergarten"](${south},${west},${north},${east});
+  way["amenity"="kindergarten"](${south},${west},${north},${east});
+  relation["amenity"="kindergarten"](${south},${west},${north},${east});
 );
 out center;`;
 
   try {
-    const response = await fetch(OVERPASS_URL, { method: 'POST', body: query });
+    const response = await fetch(OVERPASS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+    });
     if (!response.ok) return [];
     const data = await response.json();
 
@@ -82,73 +87,18 @@ out center;`;
   }
 }
 
-async function fetchNCESSchools(zipcode: string, city: string): Promise<SchoolEntry[]> {
-  const [ccdResult, pssResult] = await Promise.allSettled([
-    fetch(`${EDUCATION_DATA_URL}/ccd/directory/?zip_location=${zipcode}&per_page=200`),
-    fetch(`${EDUCATION_DATA_URL}/pss/directory/?zip=${zipcode}&per_page=200`),
-  ]);
-
-  const schools: SchoolEntry[] = [];
-
-  if (ccdResult.status === 'fulfilled' && ccdResult.value.ok) {
-    const data = await ccdResult.value.json();
-    for (const s of data.results ?? []) {
-      if (s.school_name) {
-        schools.push({
-          name: s.school_name as string,
-          zipcode,
-          city: (s.city_location as string | undefined) ?? city,
-        });
-      }
-    }
-  }
-
-  if (pssResult.status === 'fulfilled' && pssResult.value.ok) {
-    const data = await pssResult.value.json();
-    for (const s of data.results ?? []) {
-      if (s.school_name) {
-        schools.push({
-          name: s.school_name as string,
-          zipcode,
-          city: (s.city as string | undefined) ?? city,
-        });
-      }
-    }
-  }
-
-  return schools;
-}
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function mergeSchools(osm: SchoolEntry[], nces: SchoolEntry[]): SchoolEntry[] {
-  const seen = new Set(osm.map((s) => normalizeName(s.name)));
-  const merged = [...osm];
-
-  for (const school of nces) {
-    const key = normalizeName(school.name);
-    if (!seen.has(key)) {
-      seen.add(key);
-      merged.push(school);
-    }
-  }
-
-  return merged.sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export async function searchSchoolsByZipcode(zipcode: string): Promise<School[]> {
   const location = await geocodeZipcode(zipcode);
   if (!location) return [];
 
-  const { lat, lon, city } = location;
+  const { lat, lon, city, bbox } = location;
 
-  const [osmSchools, ncesSchools, baseTemp] = await Promise.all([
-    fetchOSMSchools(lat, lon, zipcode, city),
-    fetchNCESSchools(zipcode, city),
+  const [schools, baseTemp] = await Promise.all([
+    fetchOSMSchools(bbox, zipcode, city),
     fetchBaseTempF(lat, lon),
   ]);
 
-  return mergeSchools(osmSchools, ncesSchools).map((s) => ({ ...s, baseTemp }));
+  return schools
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((s) => ({ ...s, baseTemp }));
 }
